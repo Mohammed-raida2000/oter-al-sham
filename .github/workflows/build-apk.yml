@@ -2,41 +2,24 @@
 name: Build Oter Al-Sham APK
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Flutter APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
-
-      - name: Locate Flutter Project
-        id: locate
-        shell: bash
-        run: |
-          if [ -f "pubspec.yaml" ] && [ -d "lib" ]; then
-            echo "project_dir=." >> "$GITHUB_OUTPUT"
-          elif [ -f "mobile/pubspec.yaml" ] && [ -d "mobile/lib" ]; then
-            echo "project_dir=mobile" >> "$GITHUB_OUTPUT"
-          else
-            echo "ERROR: Flutter project not found."
-            echo "Expected pubspec.yaml and lib/main.dart in root or mobile/"
-            echo "Repository files:"
-            find . -maxdepth 3 \( -name pubspec.yaml -o -name main.dart \) -print
-            exit 1
-          fi
+        uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
@@ -47,26 +30,25 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check Flutter Project
-        working-directory: ${{ steps.locate.outputs.project_dir }}
+      - name: Generate Android Platform Files
+        working-directory: mobile
         run: |
           test -f pubspec.yaml
           test -f lib/main.dart
-          flutter --version
+          flutter create --platforms=android --org org.oteralsham --project-name oter_alsham .
 
       - name: Install Dependencies
-        working-directory: ${{ steps.locate.outputs.project_dir }}
+        working-directory: mobile
         run: flutter pub get
 
       - name: Build Release APK
-        working-directory: ${{ steps.locate.outputs.project_dir }}
+        working-directory: mobile
         run: flutter build apk --release
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: oter-al-sham-apk
-          path: ${{ steps.locate.outputs.project_dir }}/build/app/outputs/flutter-apk/app-release.apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 7
