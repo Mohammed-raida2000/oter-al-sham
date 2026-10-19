@@ -1,0 +1,36 @@
+name: Build APK
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android project files (keep our own lib and pubspec)
+        run: |
+          mkdir -p /tmp/bak && cp -r lib /tmp/bak/lib && cp pubspec.yaml /tmp/bak/pubspec.yaml
+          flutter create . --platforms=android --project-name oter_alsham --org org.oteralsham
+          rm -rf lib && cp -r /tmp/bak/lib lib && cp /tmp/bak/pubspec.yaml pubspec.yaml
+      - name: Patch manifest and minSdk
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"#' $M
+          sed -i 's#android:label="[^"]*"#android:label="عطر الشام"#' $M
+          sed -i 's/flutter.minSdkVersion/23/' android/app/build.gradle* || true
+      - run: flutter pub get
+      - run: dart run flutter_launcher_icons
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oter-alsham-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
